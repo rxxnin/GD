@@ -1,0 +1,57 @@
+﻿@using GD.Shared.Common
+<div class="top-row ps-3 navbar navbar-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="">GD</a>
+        <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+    </div>
+</div>
+
+<div class="@NavMenuCssClass nav-scrollable" @onclick="ToggleNavMenu">
+    <nav class="flex-column">
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="/acc" Match="NavLinkMatch.All">
+                Аккаунт
+            </NavLink>
+            <NavLink class="nav-link" href="/adminka" Match="NavLinkMatch.All">
+                Админка
+            </NavLink>
+            <NavLink class="nav-link" href="/products" Match="NavLinkMatch.All">
+                Продукты
+            </NavLink>
+            <NavLink class="nav-link" href="/basket" Match="NavLinkMatch.All">
+                Корзина
+            </NavLink>
+            <NavLink class="nav-link" href="/courierka" Match="NavLinkMatch.All">
+                Курьер
+            </NavLink>
+        </div>
+         <div class="nav-item px-3">
+            <NavLink class="nav-link" href="/login" Match="NavLinkMatch.All">
+                Вход
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="/pos" Match="NavLinkMatch.All">
+                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> PosHub
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
+            </NavLink>
+        </div>
+    </nav>
+</div>
+
+@code {
+    private bool collapseNavMenu = true;
+
+    private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
+    
+    private void ToggleNavMenu()
+    {
+        collapseNavMenu = !collapseNavMenu;
+    }
+}

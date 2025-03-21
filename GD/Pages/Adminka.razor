@@ -1,0 +1,207 @@
+﻿@page "/adminka"
+@using System.Net.Http.Headers
+@using GD.Shared.Common
+@using GD.Shared.Request
+@using GD.Shared.Response
+<h1>Админка</h1> 
+
+@if (isAdmin) 
+{ 
+    <MudGrid> 
+        <MudItem xs="6"> 
+            <h3>Добавление товара</h3> 
+            <MudPaper Class="pa-4"> 
+                <MudForm> 
+                    <MudTextField Variant="Variant.Outlined" T="string" 
+                                  InputType="InputType.Text" 
+                                  Label="Название" 
+                                  Required="true" 
+                                  RequiredError="Название обязательно!" 
+                                  @bind-Text=@_request.Name/>
+
+                    <MudTextField Variant="Variant.Outlined" T="string" Label="Описание"
+                                  InputType="InputType.Text" 
+                                  Required="true" 
+                                  RequiredError="Описание обязательно!" 
+                                  @bind-Text=@_request.Description/> 
+
+                    <MudFileUpload T="IBrowserFile" Accept=".png" FilesChanged="UploadFiles"> 
+                        <ActivatorContent> 
+                            <MudButton Variant="Variant.Outlined" 
+                                       Color="Color.Primary" 
+                                       StartIcon="@Icons.Material.Filled.CloudUpload"> 
+                                Загрузить файлы 
+                            </MudButton> 
+                        </ActivatorContent> 
+                    </MudFileUpload>
+
+                    <MudTextField Variant="Variant.Outlined" T="double" Label="Цена"
+                                  InputType="InputType.Number" 
+                                  Required="true" 
+                                  RequiredError="Цена обязательна!" 
+                                  @bind-Value=@_request.Price/>
+
+                    <MudTextField Variant="Variant.Outlined" T="string" Label="Теги"
+                                  InputType="InputType.Text" 
+                                  Required="true" 
+                                  RequiredError="Теги обязательны!" 
+                                  @bind-Value=@_request.Tags/>
+
+                    <MudTextField Variant="Variant.Outlined" T="double" Label="Количество"
+                                  InputType="InputType.Number" 
+                                  Required="true" 
+                                  RequiredError="Количество обязательно!" 
+                                  @bind-Value=@_request.Amount/> 
+
+                    <div class="d-flex align-center justify-space-between"> 
+                        <MudButton Variant="Variant.Outlined" OnClick="AddProduct" Color="Color.Primary" Class="ml-auto">Добавить</MudButton> 
+                    </div> 
+                </MudForm> 
+            </MudPaper> 
+        </MudItem> 
+        <MudItem xs="6"> 
+            <MudButton Variant="Variant.Outlined" class="nav-link" Href="/map" > 
+                Карта 
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" class="nav-link" Href="/map2">
+                Карта2
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" class="nav-link" Href="/dashboard">
+                Отчеты
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" class="nav-link" Href="/order-history">
+                Заказы
+            </MudButton>
+
+            <h3>Пользователи</h3> 
+            <MudPaper Class="pa-4"> 
+                @foreach (var client in _clients) 
+                { 
+                    <MudCard> 
+                        <MudText>Айди: @client.Id</MudText> 
+                        <MudText>Почта: @client.Email</MudText> 
+                        <MudText>Баланс: @client.Balance</MudText> 
+                        <div class="d-flex align-center justify-space-between"> 
+                            <MudButton Variant="Variant.Outlined" OnClick="() => MakeCourier(client.Id)" Color="Color.Primary" Class="ml-auto">Сделать курьером</MudButton> 
+                        </div> 
+                    </MudCard> 
+                } 
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+else
+{
+    <h1>Вы не администратор</h1>
+}
+
+
+@code {
+    readonly Request _request = new();
+    bool isAdmin = false;
+    List<User> _clients = [];
+    MemoryStream image = new MemoryStream();
+
+    async Task AddProduct()
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, "api/product");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await _ls.GetItemAsStringAsync("JWT"));
+        request.Content = JsonContent.Create(_request);
+        var response = await _client.SendAsync(request);
+
+        var result = await response.Content.ReadFromJsonAsync<Response>();
+
+        if (imageData != null)
+        {
+            var imageRequest = new HttpRequestMessage(HttpMethod.Post, $"api/product/image?id={result!.Id}");
+            imageRequest.Content = new ByteArrayContent(imageData);
+            var response2 = await _client.SendAsync(imageRequest);
+            if (response2.IsSuccessStatusCode)
+            {
+                _snakbar.Add("Изображение добавлено");
+            }
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await _auth.GetAuthenticationStateAsync();
+        var user = authState.User;
+        isAdmin = user.IsInRole(GDUserRoles.Admin);
+        _auth.AuthenticationStateChanged += _ => StateHasChanged();
+
+        if (isAdmin)
+        {
+            _clients = (await _http.GetAsync<List<User>>("api/admin/users")).Data!;
+        }
+
+        StateHasChanged();
+    }
+
+    class User
+    {
+        public Guid Id { get; set; }
+        public string Email { get; set; }
+        public double Balance { get; set; }
+        public double PosLati { get; set; }
+        public double PosLong { get; set; }
+    }
+
+    class Response
+    {
+        public Guid Id { get; set; }
+        public string Name { get; set; }
+        public string Description { get; set; }
+        public string ImageValue { get; set; }
+        public double Price { get; set; }
+        public string Tags { get; set; }
+        public int Amount { get; set; }
+
+        public List<Feedback> Feedbacks { get;set;}
+    }
+
+    class Feedback
+    {
+        public Guid Id { get; set; }
+        public Guid ProductId { get; set; }
+        public int Stars { get; set; }
+        public Guid ClientId { get; set; }
+        public string Text { get; set; }
+        public DateTime CreatedAt { get; set; }
+    }
+
+    class Request
+    {
+        public string Name { get; set; }
+        public string Description { get; set; }
+        public string Tags { get; set; }
+        public string ImageValue { get; set; }
+        public double Amount { get; set; }
+        public double Price { get; set; }
+    }
+
+    private async Task MakeCourier(Guid clientId)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/Courier/new");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await _ls.GetItemAsStringAsync("JWT"));
+        request.Content = JsonContent.Create(new { clientId });
+        _clients.RemoveAll(c => c.Id == clientId);
+        await _client.SendAsync(request);
+    }
+
+    string fileName = "";
+    string fileType = "";
+    byte[] imageData;
+    private async Task UploadFiles(IBrowserFile? arg)
+    {
+        if (arg is null) return;
+        using var stream = arg.OpenReadStream(135271630);
+        using var ms = new MemoryStream();
+        await stream.CopyToAsync(ms);
+        imageData = ms.ToArray();
+        fileName = arg.Name;
+        fileType = arg.ContentType;
+    }
+
+
+}

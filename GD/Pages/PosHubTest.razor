@@ -1,0 +1,70 @@
+﻿@using GD.Shared.Response
+@using Microsoft.AspNetCore.SignalR.Client
+
+
+@page "/pos"
+
+<h3>PosHubTest</h3>
+
+
+@inject NavigationManager NavigationManager
+@inject HttpClient HttpClient
+
+<h3>Position Tracking</h3>
+
+<input @bind="userName" placeholder="Enter your name" />
+<input @bind="position" placeholder="Enter your position" />
+<button @onclick="SendPosition">Send Position</button>
+
+<MudPaper>
+    <MudList T="string">
+        @foreach (var p in poslog)
+        {
+            <MudListItem>@p.UserId : @p.TargetPosLong @p.TargetPosLati</MudListItem>
+        }
+    </MudList>
+</MudPaper>
+
+@code {
+    private string userName;
+    private string position;
+
+    List<HubPosInfo> poslog = new();
+
+    private HubConnection hubConnection;
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        var url = new Uri(HttpClient.BaseAddress + "poshub");
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(url)
+            .Build();
+
+        hubConnection.On<HubPosInfo>("SharePos", (info) =>
+        {
+            poslog.Add(info);
+            StateHasChanged();
+        });
+        
+        await hubConnection.StartAsync();
+    }
+
+    private async Task SendPosition()
+    {
+        await hubConnection.SendAsync("Send", userName, position);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection != null)
+        {
+            await hubConnection.DisposeAsync();
+        }
+    }
+}
+
+
+@code {
+
+}

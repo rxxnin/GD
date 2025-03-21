@@ -1,0 +1,27 @@
+﻿@using System.Net.Http
+@using System.Net.Http.Json
+@using GD.Services
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Components.Routing
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.AspNetCore.Components.Web.Virtualization
+@using Microsoft.AspNetCore.Components.WebAssembly.Http
+@using Microsoft.JSInterop
+@using GD
+@using GD.Layout
+@using MudBlazor
+@using Blazored.LocalStorage;
+@using Darnton.Blazor.DeviceInterop.Geolocation
+
+
+@inject ISnackbar _snakbar
+@inject HttpService _http
+@inject HttpClient _client
+@inject UserService _userService
+@inject AuthenticationStateProvider _auth
+@inject ILocalStorageService _ls
+@inject NavigationManager _nm
+@inject GeolocationService _geolocationService
+@inject IDialogService _dialog
+

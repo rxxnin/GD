@@ -1,0 +1,78 @@
+﻿@page "/order-history"
+@using GD.Shared.Response
+
+@inject HttpClient Http
+
+<h3>История заказов</h3>
+
+@if (orders == null)
+{
+    <p><em>Загрузка...</em></p>
+}
+else if (orders.Count == 0)
+{
+    <p><em>История заказов пуста.</em></p>
+}
+else
+{
+    <MudTable T="OrderHistoryItemDTO" Items="orders" Striped="true" Hover="true">
+        <HeaderContent>
+            <MudTh>Дата</MudTh>
+            <MudTh>Номер заказа</MudTh>
+            <MudTh>Клиент</MudTh>
+            <MudTh>Адрес доставки</MudTh>
+            <MudTh>Статус</MudTh>
+            <MudTh>Доставщик</MudTh>
+            <MudTh>Сумма заказа</MudTh>
+            <MudTh>Товары</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>@context.Date</MudTd>
+            <MudTd>@context.OrderId</MudTd>
+            <MudTd>@context.CustomerName</MudTd>
+            <MudTd>@context.DeliveryAddress</MudTd>
+            <MudTd>@context.Status</MudTd>
+            <MudTd>@context.DelivererName</MudTd>
+            <MudTd>@context.TotalAmount р.</MudTd>
+            <MudTd>
+                <MudButton Color="Color.Primary" OnClick="@(() => ToggleItems(@context.OrderId))">Показать товары</MudButton>
+                <MudCollapse Expanded="@context.IsItemsVisible">
+                    <MudCard>
+                        <MudCardContent>
+                            <MudTable T="OrderItemDTO" Items="@context.OrderItems" Striped="true" Hover="true">
+                                <HeaderContent>
+                                    <MudTh>Название</MudTh>
+                                    <MudTh>Количество</MudTh>
+                                    <MudTh>Цена</MudTh>
+                                </HeaderContent>
+                                <RowTemplate Context="i">
+                                    <MudTd>@i.ProductName</MudTd>
+                                    <MudTd>@i.Quantity</MudTd>
+                                    <MudTd>@i.Price р.</MudTd>
+                                </RowTemplate>
+                            </MudTable>
+                        </MudCardContent>
+                    </MudCard>
+                </MudCollapse>
+            </MudTd>
+        </RowTemplate>
+    </MudTable>
+}
+
+@code {
+    private List<OrderHistoryItemDTO> orders;
+
+    protected override async Task OnInitializedAsync()
+    {
+        orders = await Http.GetFromJsonAsync<List<OrderHistoryItemDTO>>("api/reports/order-history");
+    }
+
+    private void ToggleItems(Guid orderId)
+    {
+        var order = orders.FirstOrDefault(o => o.OrderId == orderId);
+        if (order != null)
+        {
+            order.IsItemsVisible = !order.IsItemsVisible;
+        }
+    }
+}

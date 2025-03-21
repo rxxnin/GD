@@ -1,0 +1,91 @@
+﻿@page "/map"
+@using GD.Shared.Common
+@using LeafletForBlazor
+@inject HttpClient Http
+
+<h3>Карта</h3>
+
+<div id="map">
+    <RealTimeMap @ref="_realTimeMap" OnAfterMapLoaded="Callback" 
+        width="1000px" height="800px"></RealTimeMap>
+</div>
+
+@code {
+    RealTimeMap _realTimeMap = new();
+    List<GDUserLocation> users = new();  // List to store users
+
+    private async Task Callback()
+    {
+        await LoadUserLocations(_realTimeMap);  // Load user locations
+
+        // Set zoom level and center after users are loaded
+        if (users.Any(u => u.PosLati != default))
+        {
+            var u1 = users.First(u => u.PosLati != default);
+            _realTimeMap.View.setZoomLevel = 12;
+            _realTimeMap.View.setCenter = new()
+                {
+                    latitude = u1.PosLati,
+                    longitude = u1.PosLong,
+                };
+        }
+
+        // Переместите Appearance на конец, чтобы он применялся к уже существующим
+        //Appearence(_realTimeMap);
+    }
+
+    private async Task LoadUserLocations(RealTimeMap rtm)
+    {
+        await GetAllUsers();  // Fetch all users
+        Console.WriteLine("users: " + users.Count);
+        var streamPoints = users
+            .Where(user => user.PosLati != default && user.PosLong != default)
+            .Select(user => new RealTimeMap.StreamPoint
+                {
+                    latitude = user.PosLati,
+                    longitude = user.PosLong,
+                    type = user.Role
+                }).ToList();
+
+        rtm.Geometric.Points.AppearanceOnType(item => item.type == GDUserRoles.Client)
+            .pattern = new RealTimeMap.PointSymbol()
+        {
+            radius = 10,
+            fillColor = "green"
+        };
+
+        rtm.Geometric.Points.AppearanceOnType(item => item.type == GDUserRoles.Courier)
+            .pattern = new RealTimeMap.PointSymbol()
+        {
+            radius = 10,
+            fillColor = "blue"
+        };
+
+        await rtm.Geometric.Points.upload(streamPoints, true);
+        //Appearence(_realTimeMap);
+    }
+
+    private async Task GetAllUsers()
+    {
+        var response = await Http.GetAsync("api/admin/allusers");  // API path to get all users
+        response.EnsureSuccessStatusCode();
+
+        users = await response.Content.ReadFromJsonAsync<List<GDUserLocation>>()??new();  // Deserialize response
+    }
+
+    // Define a DTO to map the user data
+    public class GDUserLocation
+    {
+        public Guid Id { get; set; }
+        public string Email { get; set; }
+        public double Balance { get; set; }
+        public double PosLati { get; set; }
+        public double PosLong { get; set; }
+        public string Role { get; set; }
+    }
+}
+
+<script>
+
+    document.getElementsByClassName('leaflet-control-attribution')[0].style.display = 'none';
+</script>

@@ -1,0 +1,60 @@
+﻿@using GD.Shared.Common
+@inherits LayoutComponentBase
+@* Required *@
+<MudThemeProvider />
+<MudPopoverProvider />
+
+@* Needed for dialogs *@
+<MudDialogProvider />
+
+@* Needed for snackbars *@
+<MudSnackbarProvider />
+
+<div class="page">
+    <div class="sidebar">
+        <NavMenu />
+    </div>
+
+    <main>
+        <div class="top-row px-4">
+            <MudButton>@authMessage</MudButton>
+            <MudText>@role</MudText>
+        </div>
+
+        <article class="content px-4">
+            @Body
+        </article>
+    </main>
+</div>
+
+@code{
+    string authMessage = "";
+    string role = "";
+    protected override async Task OnInitializedAsync()
+    {
+        await GetClaimsPrincipalData();
+    }
+
+    protected override void OnInitialized()
+    {
+        GetClaimsPrincipalData();
+    }
+
+    private async Task GetClaimsPrincipalData()
+    {
+        var authState = await _auth
+            .GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity is not null && user.Identity.IsAuthenticated)
+        {
+            authMessage = $"{user.Identity.Name}";
+            var claims = user.Claims;
+            role = claims.FirstOrDefault(c => c.Type == GDUserClaimTypes.Roles)!.Value;
+        }
+        else
+        {
+            authMessage = "Вход";
+        }
+    }
+}

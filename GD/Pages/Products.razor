@@ -1,0 +1,190 @@
+﻿@page "/Products"
+@using System.Net.Http.Headers
+@using GD.Shared.Common
+@using GD.Shared.Request
+@using MudBlazor
+@using System.Security.Claims
+
+<h3>Продукция</h3>
+
+<MudSelect Variant="Variant.Outlined" T="string" @bind-Value="selectedTag" Label="Выберите категорию" @onchange="@((e) => OnTagChange(e.Value.ToString()))">
+    <MudSelectItem T="string" Value="@("")">Все</MudSelectItem>
+    @foreach(var tag in uniqueTags)
+    {
+        <MudSelectItem Value="@tag">@tag</MudSelectItem>
+    }
+</MudSelect>
+
+<div class="product-card-container">
+    @foreach (var product in FilteredProducts)
+    {
+        if (product.IsDeleted && user.IsInRole(GDUserRoles.Admin) == false)
+        {
+            
+        }
+        else
+        {
+            <MudCard Class="product-card">
+                <MudCardContent>
+                    <img class="product-image" src="data:image/png;base64, @product.ImageValue" alt="Изображение продукта" />
+                    <MudText Class="product-name" Typo="Typo.h6">
+                        @product.Name
+                        @if (user.IsInRole(GDUserRoles.Admin))
+                        {
+                            if (product.IsDeleted)
+                            {
+                                <MudChip T=string Color="Color.Warning">Удален</MudChip>
+                            }
+                            else
+                            {
+                                <MudIconButton Color="Color.Error" Icon="@Icons.Material.Outlined.Delete"
+                                               OnClick="() => SoftDeleteProduct(product)"></MudIconButton>
+                            }
+
+                        }
+
+                    </MudText>
+                    <MudText Typo="Typo.body2">@product.Description</MudText>
+                    <MudText Typo="Typo.body2"><strong>Теги:</strong> @product.Tags</MudText>
+                    <MudText Typo="Typo.body1" Class="product-price">@product.Price руб</MudText>
+                </MudCardContent>
+                <MudCardActions>
+                    <MudButton OnClick="() => AddToOrder(product.Id)"
+                               Variant="Variant.Text"
+                               Color="MudBlazor.Color.Primary">
+                        Добавить в заказ
+                    </MudButton>
+                    <MudButton OnClick="() => LeaveReview(product.Id)"
+                               Variant="Variant.Text"
+                               Color="MudBlazor.Color.Secondary">
+                        Оставить отзыв
+                    </MudButton>
+                </MudCardActions>
+            </MudCard>
+        }
+    }
+</div>
+
+
+
+
+@code {
+    List<Request> _products = [];
+    private List<string> uniqueTags = new List<string>();
+    private string selectedTag = ""; // Выбранный тег
+    ClaimsPrincipal user = new();
+    private IEnumerable<Request> FilteredProducts => selectedTag == "" 
+            ? _products 
+            : _products.Where(p => p.Tags.Contains(selectedTag));
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await _auth.GetAuthenticationStateAsync();
+        user = authState.User;
+
+        var response = await _client.GetAsync("api/product");
+        _products = await response.Content.ReadFromJsonAsync<List<Request>>() ?? [];
+
+        // Извлекаем уникальные теги
+        uniqueTags = _products.SelectMany(p => p.Tags.Split(','))
+                              .Select(t => t.Trim())
+                              .Distinct()
+                              .ToList();
+    }
+
+    void SoftDeleteProduct(Request prod)
+    {
+        DeleteRequest request = new DeleteRequest()
+            {
+                Id = prod.Id,
+            };
+
+        var res = _client.DeleteFromJsonAsync<DeleteRequest>($"/api/product?id={prod.Id}");
+
+
+    }
+
+    private async Task AddToOrder(Guid id)
+    {
+        var openRequest = new HttpRequestMessage(HttpMethod.Post, "/api/Order/open");
+        var openResponse = await _client.SendAsync(openRequest);
+        var data = await openResponse.Content.ReadFromJsonAsync<Response>();
+        var orderId = data!.Id;
+        await _ls.SetItemAsStringAsync("order", orderId.ToString());
+
+        var addRequest = new HttpRequestMessage(HttpMethod.Post, "/api/Order/add");
+        addRequest.Content = JsonContent.Create(new
+        {
+            OrderId = orderId,
+            ProductId = id,
+            Amount = 1
+        });
+
+        await _client.SendAsync(addRequest);
+    }
+
+    private void OnTagChange(string newTag)
+    {
+        selectedTag = newTag;
+    }
+
+    private void LeaveReview(Guid productId)
+    {
+        // Логика для оставления отзыва (например, навигация на страницу отзыва)
+        _nm.NavigateTo($"/Feedback/{productId}");
+    }
+
+    class Request
+    {
+        public Guid Id { get; set; }
+        public string Name { get; set; }
+        public string Description { get; set; }
+        public string ImageValue { get; set; }
+        public double Price { get; set; }
+        public string Tags { get; set; }
+        public int Amount { get; set; }
+        public bool IsDeleted { get; set; }
+    }
+
+    class Response
+    {
+        public Guid Id { get; set; }
+    }
+}
+
+<style>
+    .product-card-container {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 20px;
+        padding: 20px; /* Добавлено отступ для контейнера */
+    }
+
+    .product-card {
+        width: 300px; /* Укажите желаемую ширину карточки */
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        transition: transform 0.2s;
+        overflow: hidden; /* Предотвращение выхода за границы карточки */
+    }
+
+        .product-card:hover {
+            transform: scale(1.05);
+        }
+
+    .product-image {
+        width: 100%; /* Установить ширину изображения на 100% карточки */
+        height: auto; /* Автоматическая высота для сохранения пропорций */
+    }
+
+    .product-name {
+        font-weight: bold;
+        margin-bottom: 8px;
+    }
+
+    .product-price {
+        color: #007bff;
+        font-size: 1.2em;
+        margin-top: 8px;
+    }
+</style>

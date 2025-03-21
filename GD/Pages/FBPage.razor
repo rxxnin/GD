@@ -1,0 +1,115 @@
+﻿@page "/Feedback/{productId:guid}" 
+@using System.Net.Http.Headers 
+@using GD.Shared.Request
+@using GD.Shared.Response
+@using MudBlazor 
+@inject HttpClient HttpClient 
+
+<h3>Оставить отзыв</h3>
+
+<MudText  Typography="Typo.h6">Вы оставляете отзыв для продукта с ID: @productId</MudText>
+
+<MudRating Size="Size.Large" @bind-SelectedValue="rating" Label="Оценка" />
+
+<MudTextField T="string" Variant="Variant.Outlined" @bind-Text="feedbackText" Label="Ваш отзыв" Multiline="true" Rows="4" />
+
+<MudButton Color="Color.Primary" OnClick="@SubmitFeedback">Отправить отзыв</MudButton>
+
+<hr />
+
+<MudText Typo="Typo.h5" Class="my-4">Отзывы:</MudText>   
+<MudGrid>
+    @if (feedbacks != null && feedbacks.Any()) 
+    { 
+        foreach (var feedback in feedbacks) 
+        {
+
+            <MudListItem T="string">
+                <MudCard Class="my-2">
+                    <!-- Картка для отзыва -->
+                    <MudCardContent>
+                        <MudRating @bind-SelectedValue="@feedback.Stars" Size="Size.Large" ReadOnly="true" />
+                        <MudText>@feedback.Text</MudText>
+                        <MudText Typo="Typo.caption" Class="mt-2">@feedback.CreatedAt.ToString("G")</MudText>
+                    </MudCardContent>
+                </MudCard>
+            </MudListItem>
+        } 
+    } 
+    else 
+    { 
+        <MudListItem T="string"> 
+            <MudText>Нет отзывов для этого продукта.</MudText> 
+        </MudListItem> 
+    } 
+</MudGrid>
+
+
+@code {
+    [Parameter]
+    public Guid productId { get; set; } // Получаем ID продукта из URL
+
+    private int rating;
+    private string feedbackText = "Тестовый отзыв 1";
+    private List<FeedbackResponse> feedbacks = new List<FeedbackResponse>();  // Список отзывов
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadFeedbacks();  // Загрузка отзывов при инициализации
+    }
+
+    private async Task SubmitFeedback()
+    {
+        if (rating == 0 || string.IsNullOrWhiteSpace(feedbackText))
+        {
+            _snakbar.Add("Пожалуйста, заполните все поля.", Severity.Error);
+            return;
+        }
+
+        var feedbackRequest = new FeedbackRequest
+        {
+            ProductId = productId,
+            Stars = rating,
+            Text = feedbackText
+        };
+
+        var response = await HttpClient.PostAsJsonAsync("api/feedback/feedback", feedbackRequest);
+
+        if (response.IsSuccessStatusCode)
+        {
+            _snakbar.Add("Отзыв успешно отправлен!", Severity.Success);
+            // Сбросить поля после успешной отправки
+            rating = 0;
+            feedbackText = string.Empty;
+        }
+        else
+        {
+            var errorMessage = await response.Content.ReadAsStringAsync();
+            _snakbar.Add($"Ошибка: {errorMessage}", Severity.Error);
+        }
+    }
+
+    private async Task LoadFeedbacks()
+    {
+        var response = await HttpClient.GetAsync($"api/feedback/feedback/{productId}");
+        if (response.IsSuccessStatusCode)
+        {
+            feedbacks = await response.Content.ReadFromJsonAsync<List<FeedbackResponse>>() ?? new List<FeedbackResponse>();
+        }
+        else
+        {
+            _snakbar.Add("Ошибка");
+        }
+    }
+
+}
+
+<style>
+    .mud-card {
+        background-color: #f9f9f9;
+        border-radius: 8px;
+        border: 1px solid #e0e0e0;
+    }
+
+</style>

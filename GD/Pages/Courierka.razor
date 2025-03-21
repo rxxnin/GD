@@ -1,0 +1,82 @@
+﻿@page "/Courierka"
+@using System.Net.Http.Headers
+@using GD.Shared.Common
+<h3>Courierka</h3>
+
+@if (isCourier)
+{
+    @foreach (var response in _responses.Where(r => r.Status == GDOrderStatuses.Waiting))
+    {
+        @foreach (var product in response!.Products)
+        {
+            <MudCard>
+                <MudCardContent>
+                    <img width="300" src="data:image/png;base64, @product.ImageValue" alt="Red dot" />
+                    <MudText>@product.Name</MudText>
+                    <MudText Typo="Typo.body2">@product.Description</MudText>
+                    <MudText Typo="Typo.body2">@product.Tags</MudText>
+                    <MudText Typo="Typo.body2">@product.Price$</MudText>
+                </MudCardContent>
+            </MudCard>
+        }
+        <MudCardActions>
+            <MudButton OnClick="() => TakeOrder(response.Id)"
+                       Variant="Variant.Text"
+                       Color="Color.Primary">
+                Take order
+            </MudButton>
+        </MudCardActions>
+    }
+}
+else
+{
+    <h2>You are not courier</h2>
+}
+
+@code {
+    bool isCourier = false;
+    List<Response> _responses = new();
+
+    private async Task TakeOrder(Guid id)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, $"api/order/take?id={id}");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await _ls.GetItemAsStringAsync("JWT"));
+        var response = await _client.SendAsync(request);
+    }
+    
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await _auth.GetAuthenticationStateAsync();
+        var user = authState.User;
+        isCourier = user.IsInRole(GDUserRoles.Courier);
+        _auth.AuthenticationStateChanged += _ => StateHasChanged();
+
+        if (isCourier)
+        {
+            var request = new HttpRequestMessage(HttpMethod.Get, "api/order/waiting");
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await _ls.GetItemAsStringAsync("JWT"));
+            var response = await _client.SendAsync(request);
+            _responses = await response.Content.ReadFromJsonAsync<List<Response>>() ?? new();
+        }
+
+        StateHasChanged();
+    }
+
+    class ProductResponse
+    {
+        public Guid Id { get; set; }
+        public string Name { get; set; }
+        public string Description { get; set; }
+        public string Tags { get; set; }
+        public string ImageValue { get; set; }
+        public double Amount { get; set; }
+        public double Price { get; set; }
+    }
+
+    class Response
+    {
+        public Guid Id { get; set; }
+        public string Status { get; set; } = "";
+        public List<ProductResponse> Products { get; set; } = [];
+    }
+}

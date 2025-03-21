@@ -1,0 +1,157 @@
+﻿
+@page "/acc"
+@using System.Security.Claims
+@using GD.Shared.Common
+
+
+
+
+
+<MudGrid Spacing="10">
+    <MudItem xs="12">
+        <MudPaper>
+            <MudText Typo="Typo.h5">@authMessage</MudText>
+
+            <MudList T="string">
+                <MudText>Почта: @_user.Email</MudText>
+                <MudText>Роль: @role</MudText>
+                <MudText>Баланс: @_user.Balance р.</MudText>
+                <MudText>Адрес: @_user.Address</MudText>
+
+                <MudTextField Label="Longitude" Immediate @bind-Text=@longpos></MudTextField>
+                <MudTextField Label="Latitude" Immediate @bind-Text=@latipos></MudTextField>
+
+            </MudList>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12">
+        <h3>Сменить локацию</h3>
+        <MudPaper Class="pa-4">
+            <MudForm>
+                <MudTextField T="string"
+                              InputType="InputType.Text"
+                              Label="Ваш текущий адрес"
+                              Required="true"
+                              RequiredError="Address is required!"
+                              @bind-Text=@location.Address/>
+
+                <div class="d-flex align-center justify-space-between">
+                    <MudButton Variant="Variant.Filled" OnClick="ChangeLocation" Color="Color.Primary" Class="ml-auto">Сохранить</MudButton>
+                </div>
+            </MudForm>
+        </MudPaper>
+    </MudItem>
+    @if (role == GDUserRoles.Admin)
+    {
+        <MudItem xs="12">
+            <h3>Добавить к балансу</h3>
+            <MudPaper Class="pa-4">
+                <MudForm>
+                    <MudTextField T="int"
+                                  InputType="InputType.Number"
+                                  Label="Количество"
+                                  Required="true"
+                                  RequiredError="Amount is required!"
+                                  @bind-Value=@amount />
+                    <div class="d-flex align-center justify-space-between">
+                        <MudButton Variant="Variant.Filled" OnClick="AddToBalance" Color="Color.Primary" Class="ml-auto">Сменить</MudButton>
+                    </div>
+                </MudForm>
+            </MudPaper>
+        </MudItem>
+    }
+   
+</MudGrid>
+
+<MudList T="string">
+   
+    
+</MudList>
+
+@code {
+    string latipos;
+    string longpos;
+
+    private string? authMessage;
+    private string? surname;
+    private string role = "";
+    private IEnumerable<Claim> claims = Enumerable.Empty<Claim>();
+    Location location = new();
+    User _user = new();
+    int amount = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await GetClaimsPrincipalData();
+        var result = await _geolocationService.GetCurrentPosition();
+
+        location.PosLati = result.Position.Coords.Latitude;
+        location.PosLong = result.Position.Coords.Longitude;
+        latipos = location.PosLati.ToString();
+        longpos = location.PosLong.ToString();
+    }
+
+    private async Task GetClaimsPrincipalData()
+    {
+        var authState = await _auth
+            .GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity is not null && user.Identity.IsAuthenticated)
+        {
+            authMessage = $"{user.Identity.Name}";
+            claims = user.Claims;
+            role = claims.FirstOrDefault(c => c.Type == GDUserClaimTypes.Roles)!.Value;
+            _user = (await _http.GetAsync<User>("api/auth/info")).Data!;
+        }
+        else
+        {
+            authMessage = "The user is NOT authenticated.";
+        }
+    }
+
+    private async Task ChangeLocation()
+    {
+        var result = await _geolocationService.GetCurrentPosition();
+        if (result.IsSuccess)
+        {
+            location.PosLati = string.IsNullOrEmpty(latipos) ? location.PosLati : double.Parse(latipos);
+            location.PosLong = string.IsNullOrEmpty(longpos) ? location.PosLong : double.Parse(longpos);
+            _user.Address = location.Address;
+            _user.PosLati = string.IsNullOrEmpty(latipos) ? location.PosLati: double.Parse(latipos);
+            _user.PosLong = string.IsNullOrEmpty(longpos) ? location.PosLong: double.Parse(longpos) ;
+            await _http.PostAsync<Location, Unit>("/api/Client/location", location);
+            _snakbar.Add("Изменено успешно");
+        }
+        else
+        {
+            _snakbar.Add("Не получилось получить ваш геолокацию");
+        }
+    }
+
+    class Location
+    {
+        public string Address { get; set; }
+        public double PosLati { get; set; }
+        public double PosLong { get; set; }
+    }
+
+    class User
+    {
+        public Guid Id { get; set; }
+        public string Email { get; set; }
+        public string Address { get; set; }
+        public double Balance { get; set; }
+        public double PosLati { get; set; }
+        public double PosLong { get; set; }
+    }
+    
+    private async Task AddToBalance()
+    {
+        await _http.PostAsync<Req, Unit>("/api/Client/balance/add", new(amount));
+        _user.Balance += amount;
+        //StateHasChanged();
+    }
+
+    record Req(int Amount);
+}

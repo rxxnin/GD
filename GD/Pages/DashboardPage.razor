@@ -1,0 +1,100 @@
+﻿@page "/dashboard"
+@using GD.Shared.Response
+<h3>Dashboard Page</h3>
+
+<div>
+    <h4>Отчет по заказам по дням</h4>
+    <MudChart ChartOptions="options" ChartType="ChartType.Line" ChartSeries="@DailyOrderSeries"
+              XAxisLabels="@XAxisLabels.ToArray()" Width="100%" Height="550px"></MudChart>
+
+    <MudText Typo="Typo.h6">Общая статистика по заказам</MudText>
+
+    <MudTable Items="@DailyStatistics" Striped="true" Hover="true">
+        <HeaderContent>
+            <MudTh>Дата</MudTh>
+            <MudTh>Успешные заказы</MudTh>
+            <MudTh>Неудачные заказы</MudTh>
+            <MudTh>Заказы в ожидании</MudTh>
+            <MudTh>Выбор заказов</MudTh>
+            <MudTh>Заказы в доставке</MudTh>
+            <MudTh>Доставленные заказы</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>@context.Date.ToString("dd/MM/yyyy")</MudTd>
+            <MudTd>@context.SuccessfulOrders</MudTd>
+            <MudTd>@context.FailedOrders</MudTd>
+            <MudTd>@context.WaitingOrders</MudTd>
+            <MudTd>@context.SelectingOrders</MudTd>
+            <MudTd>@context.InDeliveryOrders</MudTd>
+            <MudTd>@context.DeliveredOrders</MudTd>
+        </RowTemplate>
+    </MudTable>
+</div>
+
+@code {
+    ChartOptions options = new()
+        {
+            YAxisTicks = 1,
+        };
+
+    private List<ChartSeries> DailyOrderSeries { get; set; } = new();
+    private List<string> XAxisLabels { get; set; } = new();
+    private List<DailyOrderStatisticsDTO> DailyStatistics { get; set; } = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadOrderStatistics();
+        DailyStatistics.Reverse();
+    }
+
+    private async Task LoadOrderStatistics()
+    {
+        try
+        {
+            var response = await _client.GetFromJsonAsync<OrderStatisticsResponseDTO>("api/reports/order-statistics");
+
+            DailyOrderSeries = new List<ChartSeries>();
+            XAxisLabels = new List<string>();
+            DailyStatistics = new List<DailyOrderStatisticsDTO>(); // Initialize the daily statistics list
+
+            // Инициализируем временные коллекции для различных статусов
+            var successfulOrders = new List<double>();
+            var failedOrders = new List<double>();
+            var selectingOrders = new List<double>();
+            var waitingOrders = new List<double>();
+            var inDeliveryOrders = new List<double>();
+            var deliveredOrders = new List<double>();
+
+            foreach (var dailyStat in response.DailyStatistics)
+            {
+                XAxisLabels.Add(dailyStat.Date.ToString("dd"));
+
+                successfulOrders.Add(dailyStat.SuccessfulOrders);
+                failedOrders.Add(dailyStat.FailedOrders);
+                selectingOrders.Add(dailyStat.SelectingOrders);
+                waitingOrders.Add(dailyStat.WaitingOrders);
+                inDeliveryOrders.Add(dailyStat.InDeliveryOrders);
+                deliveredOrders.Add(dailyStat.DeliveredOrders);
+
+                // Add to DailyStatistics for the table
+                DailyStatistics.Add(dailyStat);
+            }
+
+            DailyOrderSeries.Add(new ChartSeries { Name = "Успешные", Data = successfulOrders.ToArray() });
+            // You can add more series if needed similar to above
+        }
+        catch (Exception ex)
+        {
+            // Handle or log exceptions
+        }
+    }
+}
+
+
+<style>
+
+
+    .mud-chart-legend-item{
+        font-size: xx-large !important;
+    }
+</style>

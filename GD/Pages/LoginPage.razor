@@ -1,0 +1,78 @@
+﻿@using System.Text.RegularExpressions
+@using System.ComponentModel.DataAnnotations
+@using GD.Shared.Request
+@using GD.Shared.Response
+@using System.Security.Claims
+@using System.Text.Json
+
+
+@page "/login"
+
+
+<MudGrid>
+    <MudItem xs="12" sm="7">
+        <MudPaper Class="pa-4">
+            <MudForm @ref="form" @bind-IsValid="@success" @bind-Errors="@errors">
+                <MudTextField Validation="@(new EmailAddressAttribute() {ErrorMessage = "The email address is invalid"})" 
+                T="string" 
+                InputType="InputType.Email "
+                Label="Email" 
+                Required="true" 
+                RequiredError="Email name is required!" 
+                @bind-Text=@Email/>
+                
+                <MudTextField T="string" Label="Password" HelperText="Choose a strong password" @ref="pwField1"
+                              InputType="InputType.Password"
+                              Validation="@(new Func<string, IEnumerable<string>>(PasswordStrength))" Required="true"
+                              RequiredError="Password is required!" 
+                              @bind-Text=@Pwd/>
+
+                <div class="d-flex align-center justify-space-between">
+                    <MudButton Variant="Variant.Filled" OnClick="OnLogin" Color="Color.Primary" Disabled="@(!success)" Class="ml-auto">Register</MudButton>
+                </div>
+            </MudForm>
+        </MudPaper>
+        
+    </MudItem>
+</MudGrid>
+
+
+@code {
+    string Email = "";
+    string Pwd = "";
+
+    bool success;
+    string[] errors = { };
+    MudTextField<string> pwField1;
+    MudForm form;
+
+
+    async Task OnLogin()
+    {
+        var dto = new SignInRequest() { Email = Email, Pwd = Pwd };
+        dto.Email = Uri.EscapeDataString(dto.Email);
+        var res = await _http.GetAsync<SignInResponse>($"api/Auth/SignIn?Email={dto.Email}&Pwd={dto.Pwd}");
+        if (res.IsSuccess)
+        {
+            var json = JsonSerializer.Serialize(await _userService.GetInfo(res.Data!.Jwt));
+            await _ls.SetItemAsStringAsync("JWT", res.Data!.Jwt);
+            await _ls.RemoveItemAsync("order");
+            _nm.NavigateTo("/acc");
+        }
+
+    }
+
+  
+
+    private IEnumerable<string> PasswordStrength(string pw)
+    {
+        if (string.IsNullOrWhiteSpace(pw))
+        {
+            yield return "Password is required!";
+            yield break;
+        }
+        if (pw.Length < 4)
+            yield return "Password must be at least of length 4";
+    }
+
+}

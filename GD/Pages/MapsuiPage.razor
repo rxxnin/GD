@@ -1,0 +1,156 @@
+﻿@using Mapsui 
+@using Mapsui.Extensions 
+@using Mapsui.Layers 
+@using Mapsui.Nts 
+@using Mapsui.Projections 
+@using Mapsui.Styles 
+@using Mapsui.UI.Blazor 
+@using Mapsui.Widgets 
+@using NetTopologySuite.Geometries 
+@using static GD.Pages.MapPage
+
+@implements IDisposable
+
+@page "/map2" 
+
+<div class="container">
+    <div class="row">
+        <div class="col border rounded p-2 canvas-container">
+            <MapControlComponent @ref="_mapControl" />
+        </div>
+    </div>
+</div>
+
+<style>
+    .canvas-container canvas {
+        width: 100%;
+        height: 80vh;
+    }
+</style>
+
+@code {
+    private MapControl? _mapControl; 
+    private Map? map; 
+    private System.Timers.Timer? _timer; 
+
+    protected override async Task OnInitializedAsync() 
+    {
+        await Task.Delay(1000);
+        await InitializeMap();
+
+        StartTimer(); // Start the timer to fetch data
+    } 
+
+    protected override async void OnAfterRender(bool firstRender) 
+    { 
+        base.OnAfterRender(firstRender); 
+        if (firstRender) 
+        { 
+            SetupMap(); 
+        } 
+    }
+    private async Task InitializeMap()
+    {
+        await GetAllUsers(); 
+        await AddUserMarks(); 
+    }
+    private void StartTimer()
+    {
+        _timer = new System.Timers.Timer(5000); // Set timer to 5 seconds
+        _timer.Elapsed += async (sender, e) => await OnTimerElapsed();
+        _timer.AutoReset = true; 
+        _timer.Enabled = true; 
+    }
+    private async Task OnTimerElapsed()
+    {
+        if (_mapControl != null)
+        {
+            await GetAllUsers();
+            await AddUserMarks();
+        }
+    }
+
+    void IDisposable.Dispose()
+    {
+        _timer?.Stop(); // Stop the timer
+        _timer?.Dispose(); // Dispose the timer
+    }
+
+    private async Task SetupMap()
+    {
+        if (_mapControl != null) 
+        { 
+            _mapControl.Map?.Layers.Add(Mapsui.Tiling.OpenStreetMap.CreateTileLayer()); 
+            map = _mapControl.Map; 
+            map.Info += MapOnInfo; 
+
+            map.Widgets.Add(new MapInfoWidget(map)); 
+
+            var centerOfLondonOntario = new MPoint(52.3997, 55.7037); 
+            var sphericalMercatorCoordinate = SphericalMercator.FromLonLat(centerOfLondonOntario.X, centerOfLondonOntario.Y).ToMPoint(); 
+            map.Home = n => n.CenterOnAndZoomTo(sphericalMercatorCoordinate, n.Resolutions[12]); 
+        } 
+    } 
+
+    List<GDUserLocation> users = new();  // List to store users 
+
+    async Task AddUserMarks() 
+    { 
+        var layer = new GenericCollectionLayer<List<IFeature>> 
+            { 
+                Style = SymbolStyles.CreatePinStyle(), 
+                Name = "Cities with callouts", 
+                IsMapInfoLayer = true, 
+            }; 
+        map.Layers.Add(layer); 
+
+        layer.Features.Clear(); // Clear existing features before adding new ones
+
+        foreach (var u in users) 
+        { 
+            if (u.PosLong != default) 
+            { 
+                var feature = new PointFeature(SphericalMercator.FromLonLat(u.PosLong, u.PosLati).ToMPoint()); 
+                feature["E"] = u.Email; 
+                feature.Styles.Add(CreateCalloutStyle(feature.ToStringOfKeyValuePairs())); 
+
+                layer.Features.Add(feature); 
+            } 
+        } 
+        layer.DataHasChanged(); 
+    } 
+
+    private static CalloutStyle CreateCalloutStyle(string content) 
+    { 
+        return new CalloutStyle 
+            {
+                Title = content,
+                TitleFont = { FontFamily = null, Size = 12, Italic = false, Bold = true },
+                TitleFontColor = new Mapsui.Styles.Color(0, 0, 0),
+                MaxWidth = 120,
+                RectRadius = 10,
+                ShadowWidth = 4,
+                Enabled = false,
+                SymbolOffset = new Offset(0, SymbolStyle.DefaultHeight * 1f)
+            };
+    }
+
+    private static void MapOnInfo(object? sender, MapInfoEventArgs e)
+    {
+        var calloutStyle = e.MapInfo?.Feature?.Styles.Where(s => s is CalloutStyle).Cast<CalloutStyle>().FirstOrDefault();
+        if (calloutStyle != null)
+        {
+            calloutStyle.Enabled = !calloutStyle.Enabled;
+            e.MapInfo?.Layer?.DataHasChanged(); // To trigger a refresh of graphics.
+        }
+    }
+
+    private async Task GetAllUsers()
+    {
+        var response = await _client.GetAsync("api/admin/allusers");
+        response.EnsureSuccessStatusCode();
+        users = await response.Content.ReadFromJsonAsync<List<GDUserLocation>>() ?? new List<GDUserLocation>();
+    }
+}
+
+

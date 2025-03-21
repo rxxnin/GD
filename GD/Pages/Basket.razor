@@ -1,0 +1,150 @@
+﻿@page "/Basket" 
+@using System.Net.Http.Headers 
+@using GD.Shared.Common 
+@using GD.Shared.Request 
+
+<h3>Ваши Заказы</h3> 
+
+@if (isClient) 
+{ 
+    @foreach (var response in _responses) 
+    { 
+        if (response.Status != GDOrderStatuses.Delivered) 
+        { 
+            <MudPaper Class="pa-4 mb-4 shadow-2"> 
+                <MudText Typography="Typo.h6" Class="mb-2">Статус: <strong>@response!.Status</strong></MudText> 
+
+                @if (response.Status == GDOrderStatuses.Selecting) 
+                { 
+                    <MudForm Class="mb-4"> 
+                        <MudSelect Variant=Variant.Outlined T="string" @bind-Value=payMethod Label="Способ оплаты" Required="true"> 
+                            <MudSelectItem Value="GDPayMethods.Online">Онлайн</MudSelectItem> 
+                            <MudSelectItem Value="GDPayMethods.BankCard">Банковская карта</MudSelectItem> 
+                            <MudSelectItem Value="GDPayMethods.Cash">Наличными</MudSelectItem> 
+                        </MudSelect> 
+
+                        <MudTextField 
+                            Variant="Variant.Outlined"
+                            T="string" 
+                            InputType="InputType.Text" 
+                            Label="Адрес доставки" 
+                            Required="true" 
+                            RequiredError="Адрес обязательно!" 
+                            @bind-Text=@toAddress /> 
+                        
+                        <div class="d-flex align-center justify-space-between mt-2"> 
+                            <MudButton Variant="Variant.Filled" OnClick="() => CompleteOrder(response.Id)" 
+                                       Color="Color.Primary" Class="ml-auto">Подтвердить</MudButton> 
+                        </div> 
+                    </MudForm> 
+                } 
+
+                <MudText Typography="Typo.subtitle1" Class="mt-4">Содержимое заказа:</MudText>
+
+                <MudGrid Justify="Justify.Center">
+                    @foreach (var productGroup in response!.Products.GroupBy(p => p.Name))
+                    { 
+                        var product = productGroup.First(); // получаем продукт из группы
+                        var quantity = productGroup.Count(); // считаем количество одинаковых продуктов
+
+                        <MudItem xs="12" sm="6" md="4" Class="d-flex justify-center"> <!-- Центрируем продукты -->
+                            <MudCard Class="mb-4" Style="text-align: center;"> 
+                                @if (!string.IsNullOrEmpty(product.ImageValue)) 
+                                { 
+                                    <img class="img-fluid" src="data:image/png;base64, @product.ImageValue" alt="Изображение продукта" /> 
+                                } 
+                                <MudCardContent> 
+                                    <MudText Typo="Typo.h5">@product.Name</MudText> 
+                                    <MudText Typo="Typo.body2">@product.Description</MudText> 
+                                    <MudText Typo="Typo.caption"># @product.Tags</MudText> 
+                                    <MudText Typography="Typo.h6" Color="Color.Primary">@product.Price руб</MudText> 
+                                    <MudText Typography="Typo.subtitle2">Количество: @quantity</MudText> <!-- Отображаем количество -->
+                                </MudCardContent>
+                            </MudCard>
+                        </MudItem>
+                    }
+                </MudGrid>
+            </MudPaper>
+        }
+    }
+}
+else
+{
+    <h2 class="text-danger">Вы не клиент</h2>
+}
+
+
+
+@code {
+    bool isClient = false;
+    List<Response> _responses = new();
+    string toAddress = "Набережные Челны, ул Моторная, д 14";
+    string payMethod = GDPayMethods.Online;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await _auth.GetAuthenticationStateAsync();
+        var user = authState.User;
+        isClient = user.IsInRole(GDUserRoles.Client);
+        _auth.AuthenticationStateChanged += _ => StateHasChanged();
+
+        if (isClient)
+        {
+            var orderId = Guid.Empty;
+            if(await _ls.ContainKeyAsync("order")) 
+                orderId = Guid.Parse((await _ls.GetItemAsStringAsync("order"))!);
+
+            var client = _client;
+            var request = new HttpRequestMessage(HttpMethod.Get, $"/api/Client/basket");
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await _ls.GetItemAsStringAsync("JWT"));
+            var response = await client.SendAsync(request);
+            _responses = await response.Content.ReadFromJsonAsync<List<Response>>() ?? new();
+
+            if (_responses.FirstOrDefault(r => r.Id == orderId)?.Status == "Delivered") await _ls.RemoveItemAsync("order");
+        }
+
+        StateHasChanged();
+    }
+
+    class ProductResponse
+    {
+        public string Name { get; set; }
+        public string Description { get; set; }
+        public string Tags { get; set; }
+        public string ImageValue { get; set; }
+        public double Amount { get; set; }
+        public double Price { get; set; }
+    }
+
+    class Response
+    {
+        public Guid Id { get; set; }
+        public string Status { get; set; } = "";
+        public List<ProductResponse> Products { get; set; } = [];
+    }
+
+    private async Task CompleteOrder(Guid orderId)
+    {
+        var client = _client;
+        var request = new HttpRequestMessage(HttpMethod.Post, $"/api/Order/completewithdefault");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await _ls.GetItemAsStringAsync("JWT"));
+        OrderRequestWithDefault requestWithDefault = new OrderRequestWithDefault
+        {
+            OrderId = orderId,
+            PayMethod = payMethod,
+            ToAddress = toAddress,
+        };
+        request.Content = JsonContent.Create(requestWithDefault);
+        var response = await client.SendAsync(request);
+
+        if (response.IsSuccessStatusCode)
+        {
+            await _ls.RemoveItemAsync("order");
+        }
+    }
+}
+
+<style>
+
+
+</style>
