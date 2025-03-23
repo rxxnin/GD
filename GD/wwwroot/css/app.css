@@ -1,5 +1,18 @@
 html, body {
     font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    height: 100%;
+}
+
+:root {
+    --mud-palette-primary: #1e88e5;
+    --mud-palette-secondary: #ff4081;
+    --mud-palette-tertiary: #7e57c2;
+    --mud-palette-info: #2196f3;
+    --mud-palette-success: #4caf50;
+    --mud-palette-warning: #ff9800;
+    --mud-palette-error: #f44336;
 }
 
 h1:focus {
@@ -7,33 +20,65 @@ h1:focus {
 }
 
 a, .btn-link {
-    color: #0071c1;
+    color: var(--mud-palette-primary);
+    text-decoration: none;
 }
 
 .btn-primary {
     color: #fff;
-    background-color: #1b6ec2;
-    border-color: #1861ac;
+    background-color: var(--mud-palette-primary);
+    border-color: var(--mud-palette-primary-darken);
 }
 
 .btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
-  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
+    box-shadow: 0 0 0 0.25rem rgba(var(--mud-palette-primary-rgb), 0.25);
 }
 
 .content {
     padding-top: 1.1rem;
 }
 
+/* Форма ввода с красивым эффектом */
+.custom-form .mud-input {
+    transition: all 0.3s ease;
+}
+
+.custom-form .mud-input:focus-within {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+/* Карточки с мягкой тенью и эффектом при наведении */
+.custom-card {
+    transition: all 0.3s ease;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.custom-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+}
+
+/* Анимация кнопок */
+.mud-button {
+    transition: all 0.2s ease;
+}
+
+.mud-button:active {
+    transform: scale(0.96);
+}
+
 .valid.modified:not([type=checkbox]) {
-    outline: 1px solid #26b050;
+    outline: 1px solid var(--mud-palette-success);
 }
 
 .invalid {
-    outline: 1px solid red;
+    outline: 1px solid var(--mud-palette-error);
 }
 
 .validation-message {
-    color: red;
+    color: var(--mud-palette-error);
 }
 
 #blazor-error-ui {
@@ -82,7 +127,7 @@ a, .btn-link {
     }
 
         .loading-progress circle:last-child {
-            stroke: #1b6ec2;
+            stroke: var(--mud-palette-primary);
             stroke-dasharray: calc(3.141 * var(--blazor-load-percentage, 0%) * 0.8), 500%;
             transition: stroke-dasharray 0.05s ease-in-out;
         }

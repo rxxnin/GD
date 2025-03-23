@@ -24,6 +24,7 @@ builder.Services.AddScoped<AuthenticationStateProvider, CustomAuthenticationStat
 builder.Services.AddScoped<HttpService>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<GeolocationService>();
+builder.Services.AddScoped<SignalRService>();
 
 await builder.Build().RunAsync();
 

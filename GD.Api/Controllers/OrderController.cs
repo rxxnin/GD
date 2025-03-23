@@ -257,6 +257,9 @@ public class OrderController : CustomController
         
         _appDbContext.Orders.Update(order);
         await _appDbContext.SaveChangesAsync();
+        
+        // Reset notification status for this order
+        PosHub.ResetNotificationStatus(oid);
 
         return Ok(order);
     }
@@ -270,15 +273,12 @@ public class OrderController : CustomController
 
         order.OrderClosedAt = DateTime.UtcNow;
         order.Status = GDOrderStatuses.Delivered;
-
-        if (order.PayMethod!.ToLower() == "online")
-        {
-            var client = await _appDbContext.Users.FirstOrDefaultAsync(u => u.Id == order.ClientId);
-            client!.Balance -= order.TotalPrice;
-        }
         
         _appDbContext.Orders.Update(order);
         await _appDbContext.SaveChangesAsync();
+        
+        // Reset notification status for this order
+        PosHub.ResetNotificationStatus(id);
 
         return Ok(order);
     }

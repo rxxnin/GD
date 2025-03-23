@@ -1,5 +1,11 @@
 ﻿@using GD.Shared.Common
+@using GD.Services
 @inherits LayoutComponentBase
+@inject SignalRService _signalRService
+@inject IJSRuntime _js
+@inject NavigationManager _navManager
+@inject AuthenticationStateProvider _auth
+
 @* Required *@
 <MudThemeProvider />
 <MudPopoverProvider />
@@ -10,29 +16,50 @@
 @* Needed for snackbars *@
 <MudSnackbarProvider />
 
-<div class="page">
-    <div class="sidebar">
+<MudLayout>
+    <MudAppBar Elevation="1" Color="Color.Primary">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@((e) => DrawerToggle())" />
+        <MudText Typo="Typo.h6" Class="ml-3">GD</MudText>
+        <MudSpacer />
+        <MudButton Color="Color.Inherit" OnClick="@(() => _navManager.NavigateTo(string.IsNullOrEmpty(role) ? "/login" : "/acc"))" StartIcon="@Icons.Material.Filled.Person">
+            @authMessage
+        </MudButton>
+        @if (!string.IsNullOrEmpty(role))
+        {
+            <MudChip T="string" Color="Color.Secondary" Size="Size.Small" Class="ml-2" Text="@role" />
+        }
+    </MudAppBar>
+    
+    <MudDrawer @bind-Open="_drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="2">
         <NavMenu />
-    </div>
-
-    <main>
-        <div class="top-row px-4">
-            <MudButton>@authMessage</MudButton>
-            <MudText>@role</MudText>
-        </div>
-
-        <article class="content px-4">
+    </MudDrawer>
+    
+    <MudMainContent>
+        <MudContainer MaxWidth="MaxWidth.Large" Class="py-4">
             @Body
-        </article>
-    </main>
-</div>
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
 
 @code{
+    private bool _drawerOpen = true;
     string authMessage = "";
     string role = "";
+    
+    private void DrawerToggle()
+    {
+        _drawerOpen = !_drawerOpen;
+    }
+    
     protected override async Task OnInitializedAsync()
     {
         await GetClaimsPrincipalData();
+        
+        // Initialize SignalR for client users only
+        if (!string.IsNullOrEmpty(role) && role == GDUserRoles.Client)
+        {
+            await _signalRService.InitializeAsync();
+        }
     }
 
     protected override void OnInitialized()
